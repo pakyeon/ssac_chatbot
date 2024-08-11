@@ -6,6 +6,10 @@ from langchain_openai import ChatOpenAI
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
+from transformers import pipeline
+
+# 감정 분류 모델
+sentiment_analysis = pipeline("sentiment-analysis", model="monologg/koelectra-base-finetuned-nsmc")
 
 # .env 파일 로드
 load_dotenv()
@@ -20,7 +24,7 @@ def print_messages():
 def add_message(role, message):
     st.session_state["messages"].append(ChatMessage(role=role, content=message))
 
-st.title("기술 질문")
+st.title("챗봇 + 감정분석")
 
 # sesssion_state 초기화
 if "messages" not in st.session_state:
@@ -42,7 +46,8 @@ def get_session_history(session_id: str) -> BaseChatMessageHistory:
 print_messages()
 
 # 사용자 입력
-if user_input := st.chat_input("메세지를 입력해주세요."):
+user_input = st.chat_input("메세지를 입력해주세요.")
+if user_input:
     st.chat_message("user").write(user_input)
     add_message("user", user_input)
     
@@ -77,8 +82,14 @@ if user_input := st.chat_input("메세지를 입력해주세요."):
         {"question": user_input},
         config={"configurable": {"session_id": "abc"}},
     )
-    msg = response.content
-    
+    msg = response.content # type: str
+    sentiment = sentiment_analysis(msg) # 답변 긍부정 분류
+    # sentiment[0]['label'] == positive or negative
+    if sentiment[0]['label'] == 'positive': 
+        sentiment_label = "(긍정)"
+    else:
+        sentiment_label = "(부정)"
+    msg += sentiment_label
     with st.chat_message("assistant"):
         st.write(msg)
     add_message("assistant", msg)
